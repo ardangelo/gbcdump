@@ -11,18 +11,15 @@ rgb_pixel_t colors[] = { /*	snow, nickel, silver, and licorice	*/
 	{255, 255, 255, 0},	{85, 85, 85, 0},
 	{170, 170, 170, 0},	{0, 0, 0, 0}
 };
-unsigned int i, j, k, tile;
+unsigned int i, j, k, z;
 
 /*	Functions	*/
 int main(int argc, char *argv[]) {
 	FILE *fileptr;
 	bmpfile_t *bmp;
-	char filename[FNLEN];
+	char filename[FNLEN], path[FNLEN];
 	char hex_buffer[2];
-	char bin1_buffer[9]; //change into bitpacked array of size 2
-	char bin2_buffer[9];
-	bin1_buffer[8] = '\0';
-	bin2_buffer[8] = '\0';
+	unsigned int tile;
 
 	for (i=1;i<argc;i++) { //i is arg iterator
 		if ((fileptr = fopen(argv[i],"rb"))) {
@@ -46,24 +43,25 @@ int main(int argc, char *argv[]) {
 	printf("File passed MAGIC check: %s\n",filename);
 	bmp = bmp_create(128,112,8);
 
-	for (i=0x2000;i<0x2000+(0x1000*1);i+=0x1000) { //i is offset
-		fseek(fileptr,i,SEEK_SET);
+	for (i=0;i<30;i++) { //i is offset
+		fseek(fileptr,0x2000+(i*0x1000),SEEK_SET);
+		printf("%02i. ",i+1);
 		for (tile=0;tile<224;tile++) {
 			for (j=0;j<8;j++) { //j is for each row of pixels
-				for (k=0;k<4;k++) { //k is for each 2 pixels in row
-					fread(hex_buffer,1,1,fileptr);
-					fread(hex_buffer+1,1,1,fileptr);
-					bytetobin(hex_buffer,bin1_buffer);
-					bytetobin(hex_buffer+1,bin2_buffer);
-					printf("%s %s\n",bin1_buffer,bin2_buffer);
-
-					//fseek(fileptr,1,SEEK_CUR); //set up for next read
+				z = 128;
+				fread(hex_buffer,2,1,fileptr);
+				for (k=0;k<8;k++) { //k is for each pixel in row
+					bmp_set_pixel(bmp,((tile % 16)*8)+k,(((tile-(tile % 16)) % 15)*8)+j,colors[((*hex_buffer & z) == z)*2+((*(hex_buffer+1) & z) == z)]);
+					z>>=1;
 				}
 			}
 		}
-	}
+		printf("Dumped. ");
 
-	bmp_save(bmp,"test.bmp");
+		sprintf(path,"%s-%02i.bmp",filename,i+1);
+		bmp_save(bmp,path);
+		printf("Written.\n");
+	}
 
 	bmp_destroy(bmp);
 	fclose(fileptr);
@@ -91,24 +89,4 @@ int validate_file(FILE *file) {
 	}
 
 	return 0;
-}
-
-const char *bytetobin(char *data, char *dest) { //from EvilTeach
-	*dest = '\0';
-
-	int z;
-	for (z = 128; z > 0; z >>= 1) {
-		strcat(dest, ((*data & z) == z) ? "1" : "0");
-	}
-
-	return dest;
-}
-
-int bit_int(const char a, const char b) {
-	switch (a) {
-		case '0': switch (b) { case '0': return 0; case '1': return 1; }
-		case '1': switch (b) { case '0': return 2; case '1': return 3; }
-	}
-
-	return -1;
 }
